@@ -1,0 +1,9 @@
+import { loadCurriculum, type RemoteClass } from './curriculum';
+export type { RemoteClass } from './curriculum';
+export type Localized = { english: string | null; malayalam: string | null; fallback: boolean };
+export type Topic = { id: string; code: string; title: Localized; description: Localized; parentId: string | null; subtopics: Topic[]; prerequisites: Topic[] };
+export type LessonBlock = { type: 'introduction' | 'analogy' | 'exercise' | 'misconception' | string; english?: string; malayalam?: string };
+export type Lesson = { id: string; classId: string; classCode: string; publicationState: 'OUTLINE' | 'DRAFT' | 'TRANSLATION_NEEDED' | 'IN_REVIEW' | 'PUBLISHED' | 'ARCHIVED'; requestedLocale: string; actualContentLocale: string; fallback: boolean; revision: number; blocks: LessonBlock[] };
+const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, '') ?? 'http://localhost:8080';
+async function response<T>(path: string, signal?: AbortSignal): Promise<T> { const result = await fetch(`${baseUrl}${path}`, { signal, credentials: 'include' }); if (!result.ok) throw new Error(`API returned ${result.status}`); return result.json() as Promise<T>; }
+export async function loadClassroom(classCode: string, locale: string, signal?: AbortSignal): Promise<{ clazz: RemoteClass; lesson: Lesson; topics: Topic[] }> { const curriculum = await loadCurriculum(signal); const clazz = curriculum.weeks.flatMap(week => week.classes).find(item => item.code === classCode); if (!clazz) throw new Error(`Class ${classCode} was not returned by the curriculum API`); const query = `?locale=${encodeURIComponent(locale)}`; const [lesson, topics] = await Promise.all([response<Lesson>(`/api/v1/classes/${clazz.id}/lessons${query}`, signal), response<Topic[]>(`/api/v1/classes/${clazz.id}/topics${query}`, signal)]); return { clazz, lesson, topics }; }

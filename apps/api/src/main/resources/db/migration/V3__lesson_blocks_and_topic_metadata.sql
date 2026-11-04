@@ -1,0 +1,4 @@
+ALTER TABLE topics ADD COLUMN difficulty VARCHAR(24) NOT NULL DEFAULT 'BEGINNER';
+ALTER TABLE topics ADD COLUMN estimated_minutes INTEGER NOT NULL DEFAULT 35;
+ALTER TABLE topics ADD COLUMN learning_objectives JSONB NOT NULL DEFAULT '[]'::jsonb;
+ALTER TABLE lesson_content ADD COLUMN content_blocks JSONB NOT NULL DEFAULT '[]'::jsonb;

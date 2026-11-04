@@ -1,0 +1,6 @@
+package com.codepathacademy.curriculum;
+import jakarta.persistence.*; import java.util.UUID; import org.hibernate.annotations.JdbcTypeCode; import org.hibernate.type.SqlTypes;
+@Entity @Table(name="lesson_content") public class LessonContent {
+ @Id @GeneratedValue private UUID id; @OneToOne(fetch=FetchType.LAZY) @JoinColumn(name="class_id") private CurriculumClass curriculumClass; @Column(name="editorial_status") private String editorialStatus; @Column(name="english_body") private String englishBody; @Column(name="malayalam_body") private String malayalamBody; @JdbcTypeCode(SqlTypes.JSON) @Column(name="content_blocks",columnDefinition="jsonb") private String contentBlocks; @Version private long version;
+ protected LessonContent(){} public LessonContent(CurriculumClass clazz,String status,String blocks){curriculumClass=clazz;editorialStatus=status;contentBlocks=blocks;} public UUID getId(){return id;} public CurriculumClass getCurriculumClass(){return curriculumClass;} public String getEditorialStatus(){return editorialStatus;} public String getEnglishBody(){return englishBody;} public String getMalayalamBody(){return malayalamBody;} public String getContentBlocks(){return contentBlocks;} public long getVersion(){return version;}
+}

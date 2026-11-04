@@ -8,6 +8,7 @@ import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import com.codepathacademy.learning.NotesService;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
@@ -20,6 +21,8 @@ public class ApiExceptionHandler {
   }
   @ExceptionHandler(java.util.NoSuchElementException.class)
   ResponseEntity<ApiError> notFound(java.util.NoSuchElementException ex) { return error(HttpStatus.NOT_FOUND, ex.getMessage(), Map.of()); }
+  @ExceptionHandler(NotesService.ConflictException.class)
+  ResponseEntity<ApiError> conflict(NotesService.ConflictException ex) { return error(HttpStatus.CONFLICT, ex.getMessage(), Map.of()); }
   private ResponseEntity<ApiError> error(HttpStatus status, String message, Map<String, String> details) {
     return ResponseEntity.status(status).body(new ApiError(Instant.now(), status.value(), message, details));
   }
