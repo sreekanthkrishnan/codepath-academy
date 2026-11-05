@@ -10,6 +10,8 @@ import { useClassroomContent } from "./hooks/useClassroomContent";
 import { ApiLessonContent } from "./components/ApiLessonContent";
 import { AuthPanel } from "./components/AuthPanel";
 import { useAuth } from "./hooks/useAuth";
+import { useNoteAutosave } from "./hooks/useNoteAutosave";
+import { useLearningProgress } from "./hooks/useLearningProgress";
 import "./styles.css";
 
 type Screen =
@@ -602,6 +604,7 @@ function App() {
                         done={done}
                         notes={notes}
                         setNotes={setNotes}
+                        authenticated={Boolean(auth.user)}
                         open={open}
                         mark={mark}
                     />
@@ -865,6 +868,7 @@ function Classroom({
     done,
     notes,
     setNotes,
+    authenticated,
     open,
     mark,
 }: {
@@ -875,6 +879,7 @@ function Classroom({
     done: number[];
     notes: Record<string, string>;
     setNotes: (x: Record<string, string>) => void;
+    authenticated: boolean;
     open: (x: Lesson) => void;
     mark: () => void;
 }) {
@@ -888,6 +893,8 @@ function Classroom({
             `CPA-W${String(active.week).padStart(2, "0")}-C${String(active.slot).padStart(2, "0")}`,
             lang === "ml" ? "ml-IN" : lang === "both" ? "both" : "en-IN",
         );
+    const noteSync = useNoteAutosave(authenticated, remote.clazz?.id, active.title, notes[key] || "", value => setNotes({ ...notes, [key]: value }));
+    const learningProgress = useLearningProgress(authenticated, remote.clazz?.id);
     const [answer, setAnswer] = useState<number | null>(null);
     return (
         <div className="classroom">
@@ -985,10 +992,11 @@ function Classroom({
                     </button>
                     <button
                         className={completed ? "complete yes" : "complete"}
-                        onClick={mark}
+                        onClick={() => { mark(); void learningProgress.toggle(); }}
                     >
                         {completed ? "✓ Completed" : "Mark class complete"}
                     </button>
+                    {authenticated && learningProgress.status === "failed" && <small>Progress is saved locally and will need retrying.</small>}
                 </div>
             </article>
             <aside className="tools">
@@ -997,13 +1005,11 @@ function Classroom({
                         My notes <small>Saved</small>
                     </h3>
                     <textarea
-                        value={notes[key] || ""}
-                        onChange={(e) =>
-                            setNotes({ ...notes, [key]: e.target.value })
-                        }
+                        value={noteSync.value}
+                        onChange={(e) => noteSync.change(e.target.value)}
                         placeholder="Capture an idea, question, or example…"
                     />
-                    <p>Autosaves in this browser</p>
+                    <p>{noteSync.status === "saved" ? "Saved to your account" : noteSync.status === "pending" || noteSync.status === "saving" ? "Saving…" : noteSync.status === "conflict" ? "Changed elsewhere — refresh before saving." : noteSync.status === "failed" ? <>Could not sync. <button onClick={noteSync.retry}>Retry</button></> : "Autosaves in this browser"}</p>
                 </div>
                 <div className="tool glossary">
                     <p className="eyebrow">BILINGUAL GLOSSARY</p>
