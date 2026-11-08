@@ -1,12 +1,12 @@
 import { getCsrfToken } from "./auth";
+import { signalSessionExpired, unauthenticatedAfterForbidden } from "./session";
 
 export type Note = { id: string; classId: string | null; topicId: string | null; title: string; body: string; bodyEn: string | null; bodyMl: string | null; version: number; createdAt: string; updatedAt: string };
-export type NoteInput = { classId: string; title: string; body: string; bodyEn?: string; bodyMl?: string; version: number };
+export type NoteInput = { classId: string; topicId?: string; title: string; body: string; bodyEn?: string; bodyMl?: string; version: number; clientKey?: string };
 const baseUrl = import.meta.env.VITE_API_BASE_URL?.replace(/\/$/, "") ?? "http://localhost:8080";
-
 async function api<T>(path: string, init?: RequestInit): Promise<T> {
     const response = await fetch(`${baseUrl}${path}`, { ...init, credentials: "include", headers: { "Content-Type": "application/json", ...init?.headers } });
-    if (!response.ok) throw new Error(response.status === 409 ? "NOTE_CONFLICT" : response.status === 401 || response.status === 403 ? "SESSION_EXPIRED" : "NOTE_REQUEST_FAILED");
+    if (!response.ok) { if (response.status === 401 || response.status === 403 && await unauthenticatedAfterForbidden(baseUrl)) { signalSessionExpired(); throw new Error("SESSION_EXPIRED"); } throw new Error(response.status === 409 ? "NOTE_CONFLICT" : response.status === 403 ? "CSRF_REJECTED" : "NOTE_REQUEST_FAILED"); }
     return response.status === 204 ? undefined as T : response.json() as Promise<T>;
 }
 async function mutate<T>(path: string, method: "POST" | "PATCH" | "DELETE", body?: unknown): Promise<T> {

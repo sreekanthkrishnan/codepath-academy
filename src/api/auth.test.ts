@@ -2,12 +2,14 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { http, HttpResponse } from "msw";
 import { setupServer } from "msw/node";
 import { getCurrentUser, login, logout, register } from "./auth";
+import { unauthenticatedAfterForbidden } from "./session";
 
 const base = "http://localhost:8080/api/v1/auth";
 const user = { id: "user-1", email: "learner@example.com", displayName: "Learner", roles: ["STUDENT"] };
 let logoutHeader = "";
+let identityProbeCount = 0;
 const server = setupServer(
-    http.get(`${base}/me`, () => HttpResponse.json(user)),
+    http.get(`${base}/me`, () => { identityProbeCount += 1; return HttpResponse.json(user); }),
     http.post(`${base}/login`, async ({ request }) => (await request.json() as { password: string }).password === "correct-horse-battery" ? HttpResponse.json(user) : new HttpResponse(null, { status: 400 })),
     http.post(`${base}/register`, () => HttpResponse.json(user, { status: 201 })),
     http.get(`${base}/csrf`, () => HttpResponse.json({ headerName: "X-XSRF-TOKEN", token: "csrf-test-token" })),
@@ -15,7 +17,7 @@ const server = setupServer(
 );
 
 beforeAll(() => server.listen({ onUnhandledRequest: "error" }));
-afterEach(() => { logoutHeader = ""; server.resetHandlers(); });
+afterEach(() => { logoutHeader = ""; identityProbeCount = 0; server.resetHandlers(); });
 afterAll(() => server.close());
 
 describe("authentication API client", () => {
@@ -32,5 +34,11 @@ describe("authentication API client", () => {
 
     it("does not expose backend failures as account-enumeration details", async () => {
         await expect(login({ email: user.email, password: "wrong" })).rejects.toThrow("AUTH_REQUEST_FAILED");
+    });
+
+    it("shares one identity probe across concurrent forbidden mutations", async () => {
+        server.use(http.get(`${base}/me`, () => { identityProbeCount += 1; return new HttpResponse(null, { status: 403 }); }));
+        await expect(Promise.all([unauthenticatedAfterForbidden("http://localhost:8080"), unauthenticatedAfterForbidden("http://localhost:8080")])).resolves.toEqual([true, true]);
+        expect(identityProbeCount).toBe(1);
     });
 });

@@ -17,7 +17,18 @@ public class NotesService {
   public NotesService(PersonalNoteRepository notes, UserRepository users, EntityManager entities) { this.notes=notes; this.users=users; this.entities=entities; }
   @Transactional(readOnly = true) public List<View> list(String userId, UUID classId, UUID topicId, String query) { return notes.findByUserIdAndDeletedAtIsNullOrderByUpdatedAtDesc(user(userId).getId()).stream().filter(n -> classId == null || (n.getCurriculumClass()!=null && classId.equals(n.getCurriculumClass().getId()))).filter(n -> topicId == null || (n.getTopic()!=null && topicId.equals(n.getTopic().getId()))).filter(n -> query == null || query.isBlank() || (n.getTitle()+"\n"+n.getBody()).toLowerCase(Locale.ROOT).contains(query.toLowerCase(Locale.ROOT))).map(this::view).toList(); }
   @Transactional(readOnly = true) public View get(String userId, UUID id) { return view(owned(userId,id)); }
-  public View create(String userId, Command command) { var note = new PersonalNote(user(userId), clazz(command.classId()), topic(command.topicId()), title(command.title()), body(command), command.bodyEn(), command.bodyMl(), null); return view(notes.save(note)); }
+  public View create(String userId, Command command) {
+    var owner=user(userId); var key=clientKey(command.clientKey());
+    if(key!=null) {
+      var existing=notes.findByUserIdAndSourceKeyAndDeletedAtIsNull(owner.getId(),key);
+      if(existing.isPresent()) {
+        var note=existing.get();
+        if(note.getBody().equals(body(command)) && note.getTitle().equals(title(command.title()))) return view(note);
+        throw new ConflictException("This client draft key is already associated with different content.");
+      }
+    }
+    var note = new PersonalNote(owner, clazz(command.classId()), topic(command.topicId()), title(command.title()), body(command), command.bodyEn(), command.bodyMl(), key); return view(notes.saveAndFlush(note));
+  }
   public View update(String userId, UUID id, Command command) { var note=owned(userId,id); if(note.getVersion()!=command.version()) throw new ConflictException("This note changed in another session. Refresh before saving."); note.update(clazz(command.classId()), topic(command.topicId()), title(command.title()), body(command), command.bodyEn(), command.bodyMl()); return view(notes.saveAndFlush(note)); }
   public void delete(String userId, UUID id, long version) { var note=owned(userId,id); if(note.getVersion()!=version) throw new ConflictException("This note changed in another session. Refresh before deleting."); note.delete(); notes.saveAndFlush(note); }
   private AppUser user(String id){ return users.findById(UUID.fromString(id)).orElseThrow(() -> new NoSuchElementException("User not found")); }
@@ -26,8 +37,9 @@ public class NotesService {
   private Topic topic(UUID id){ return id == null ? null : Optional.ofNullable(entities.find(Topic.class,id)).orElseThrow(() -> new NoSuchElementException("Topic not found")); }
   private String title(String title){ return title == null || title.isBlank() ? "Untitled note" : title.trim(); }
   private String body(Command command){ return command.body() == null ? Optional.ofNullable(command.bodyEn()).orElse(Optional.ofNullable(command.bodyMl()).orElse("")) : command.body(); }
+  private String clientKey(String key){ if(key==null||key.isBlank())return null; if(!key.matches("[A-Za-z0-9._:-]{1,64}"))throw new IllegalArgumentException("Invalid client draft key"); return key; }
   private View view(PersonalNote n){ return new View(n.getId(), n.getCurriculumClass()==null?null:n.getCurriculumClass().getId(), n.getTopic()==null?null:n.getTopic().getId(), n.getTitle(), n.getBody(), n.getBodyEn(), n.getBodyMl(), n.getVersion(), n.getCreatedAt(), n.getUpdatedAt()); }
-  public record Command(UUID classId, UUID topicId, String title, String body, String bodyEn, String bodyMl, long version) {}
+  public record Command(UUID classId, UUID topicId, String title, String body, String bodyEn, String bodyMl, long version, String clientKey) {}
   public record View(UUID id, UUID classId, UUID topicId, String title, String body, String bodyEn, String bodyMl, long version, java.time.Instant createdAt, java.time.Instant updatedAt) {}
   public static class ConflictException extends RuntimeException { public ConflictException(String message){ super(message); } }
 }

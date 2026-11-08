@@ -1,0 +1,11 @@
+spring:
+  datasource:
+    url: ${E2E_DATABASE_URL}
+    username: ${E2E_DATABASE_USERNAME}
+    password: ${E2E_DATABASE_PASSWORD}
+  jpa.hibernate.ddl-auto: validate
+  flyway.enabled: true
+server:
+  address: 127.0.0.1
+  port: ${E2E_API_PORT:18080}
+app.cors.allowed-origins: http://127.0.0.1:${E2E_WEB_PORT:4176}

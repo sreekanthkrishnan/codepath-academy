@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
     downloadLegacyLearningBackup,
@@ -12,6 +12,7 @@ import { AuthPanel } from "./components/AuthPanel";
 import { useAuth } from "./hooks/useAuth";
 import { useNoteAutosave } from "./hooks/useNoteAutosave";
 import { useLearningProgress } from "./hooks/useLearningProgress";
+import { MigrationPanel } from "./components/MigrationPanel";
 import "./styles.css";
 
 type Screen =
@@ -470,8 +471,14 @@ function App() {
         ),
         [mode, setMode] = useState<"beginner" | "deep">("beginner"),
         [toast, setToast] = useState(""),
-        [authOpen, setAuthOpen] = useState(false);
+        [authOpen, setAuthOpen] = useState(false),
+        [migrationOpen, setMigrationOpen] = useState(false);
     const auth = useAuth();
+    const priorAccountId = useRef<string | undefined>(undefined);
+    useEffect(() => {
+        if (priorAccountId.current && priorAccountId.current !== auth.user?.id) setNotes({});
+        priorAccountId.current = auth.user?.id;
+    }, [auth.user?.id]);
     useEffect(() => writeLegacy("language", lang), [lang]);
     useEffect(() => writeLegacy("progress", done), [done]);
     useEffect(() => writeLegacy("notes", notes), [notes]);
@@ -582,10 +589,13 @@ function App() {
                                     : "മ"}
                         </button>
                         <button className="streak">⚡ 4 day streak</button>
-                        {auth.loading ? <span className="auth-status">Checking account…</span> : auth.user ? <button className="auth-button" onClick={() => void auth.logout().catch(() => say("We could not sign you out. Please try again."))}>Sign out · {auth.user.displayName}</button> : <button className="auth-button" onClick={() => setAuthOpen(true)}>Sign in</button>}
+                        {auth.loading ? <span className="auth-status">Checking account…</span> : auth.user ? <button className="auth-button" onClick={() => void auth.logout().catch(() => say("We could not sign you out. Please try again."))}>Sign out · {auth.user.displayName}</button> : <button className="auth-button" onClick={() => setAuthOpen(true)}>{auth.error?.startsWith("Your session") ? "Sign in again" : "Sign in"}</button>}
+                        {auth.user && <button className="auth-button" onClick={() => setMigrationOpen(true)}>Import local data</button>}
                     </div>
                 </header>
                 {authOpen && <AuthPanel onClose={() => setAuthOpen(false)} onLogin={auth.login} onRegister={auth.register} />}
+                {auth.error?.startsWith("Your session") && <p className="auth-error" role="alert">{auth.error}</p>}
+                {migrationOpen && <MigrationPanel onClose={() => setMigrationOpen(false)} />}
                 {screen === "home" && (
                     <Home
                         pct={pct}
@@ -605,6 +615,7 @@ function App() {
                         notes={notes}
                         setNotes={setNotes}
                         authenticated={Boolean(auth.user)}
+                        accountId={auth.user?.id}
                         open={open}
                         mark={mark}
                     />
@@ -869,6 +880,7 @@ function Classroom({
     notes,
     setNotes,
     authenticated,
+    accountId,
     open,
     mark,
 }: {
@@ -880,6 +892,7 @@ function Classroom({
     notes: Record<string, string>;
     setNotes: (x: Record<string, string>) => void;
     authenticated: boolean;
+    accountId?: string;
     open: (x: Lesson) => void;
     mark: () => void;
 }) {
@@ -893,7 +906,7 @@ function Classroom({
             `CPA-W${String(active.week).padStart(2, "0")}-C${String(active.slot).padStart(2, "0")}`,
             lang === "ml" ? "ml-IN" : lang === "both" ? "both" : "en-IN",
         );
-    const noteSync = useNoteAutosave(authenticated, remote.clazz?.id, active.title, notes[key] || "", value => setNotes({ ...notes, [key]: value }));
+    const noteSync = useNoteAutosave(authenticated, accountId, remote.clazz?.id, active.title, notes[key] || "", value => setNotes({ ...notes, [key]: value }));
     const learningProgress = useLearningProgress(authenticated, remote.clazz?.id);
     const [answer, setAnswer] = useState<number | null>(null);
     return (
@@ -1009,7 +1022,7 @@ function Classroom({
                         onChange={(e) => noteSync.change(e.target.value)}
                         placeholder="Capture an idea, question, or example…"
                     />
-                    <p>{noteSync.status === "saved" ? "Saved to your account" : noteSync.status === "pending" || noteSync.status === "saving" ? "Saving…" : noteSync.status === "conflict" ? "Changed elsewhere — refresh before saving." : noteSync.status === "failed" ? <>Could not sync. <button onClick={noteSync.retry}>Retry</button></> : "Autosaves in this browser"}</p>
+                    <p>{noteSync.status === "saved" ? "Saved to your account" : noteSync.status === "pending" || noteSync.status === "saving" ? "Saving…" : noteSync.status === "conflict" ? "Changed elsewhere — refresh before saving." : noteSync.status === "session-expired" ? "Session expired — draft kept locally. Sign in again, then retry." : noteSync.status === "recovery-pending" ? <>You have an unsynchronized note. Review and <button onClick={noteSync.retry}>Retry sync</button>.</> : noteSync.status === "failed" ? <>Could not sync. <button onClick={noteSync.retry}>Retry</button></> : "Autosaves in this browser"}</p>
                 </div>
                 <div className="tool glossary">
                     <p className="eyebrow">BILINGUAL GLOSSARY</p>

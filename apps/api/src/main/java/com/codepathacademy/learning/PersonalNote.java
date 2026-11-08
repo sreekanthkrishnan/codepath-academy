@@ -28,4 +28,5 @@ public class PersonalNote {
   void update(CurriculumClass curriculumClass, Topic topic, String title, String body, String bodyEn, String bodyMl) { this.curriculumClass=curriculumClass; this.topic=topic; this.title=title; this.body=body; this.bodyEn=bodyEn; this.bodyMl=bodyMl; this.updatedAt=Instant.now(); }
   void delete() { deletedAt=Instant.now(); updatedAt=deletedAt; }
   public UUID getId(){ return id; } public AppUser getUser(){ return user; } public CurriculumClass getCurriculumClass(){ return curriculumClass; } public Topic getTopic(){ return topic; } public String getTitle(){ return title; } public String getBody(){ return body; } public String getBodyEn(){ return bodyEn; } public String getBodyMl(){ return bodyMl; } public long getVersion(){ return version; } public Instant getCreatedAt(){ return createdAt; } public Instant getUpdatedAt(){ return updatedAt; } public Instant getDeletedAt(){ return deletedAt; }
+  public String getSourceKey(){ return sourceKey; }
 }

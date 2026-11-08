@@ -14,6 +14,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.AnonymousAuthenticationFilter;
 import org.springframework.security.web.csrf.CookieCsrfTokenRepository;
+import org.springframework.security.web.csrf.CsrfTokenRequestAttributeHandler;
 import org.springframework.web.cors.CorsConfiguration;
 import org.springframework.web.cors.CorsConfigurationSource;
 import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
@@ -29,14 +30,14 @@ public class SecurityConfiguration {
     csrf.setCookieCustomizer(cookie -> cookie.path("/"));
     return http
       .cors(Customizer.withDefaults())
-      .csrf(c -> c.csrfTokenRepository(csrf).ignoringRequestMatchers("/api/v1/auth/register", "/api/v1/auth/login"))
+      .csrf(c -> c.csrfTokenRepository(csrf).csrfTokenRequestHandler(new CsrfTokenRequestAttributeHandler()).ignoringRequestMatchers("/api/v1/auth/register", "/api/v1/auth/login"))
       .sessionManagement(s -> s.sessionCreationPolicy(SessionCreationPolicy.IF_REQUIRED))
       .authorizeHttpRequests(a -> a
         .requestMatchers("/actuator/health", "/swagger-ui/**", "/swagger-ui.html", "/api-docs/**", "/api/v1/auth/register", "/api/v1/auth/login", "/api/v1/auth/csrf").permitAll()
         .requestMatchers(HttpMethod.GET, "/api/v1/programs/**", "/api/v1/weeks/**", "/api/v1/classes/**", "/api/v1/topics/**", "/api/v1/lessons/**").permitAll()
         .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "CONTENT_EDITOR", "INSTRUCTOR")
         .anyRequest().authenticated())
-      .logout(l -> l.logoutUrl("/api/v1/auth/logout").deleteCookies("JSESSIONID", "XSRF-TOKEN"))
+      .logout(l -> l.logoutUrl("/api/v1/auth/logout").logoutSuccessHandler((request, response, authentication) -> response.setStatus(204)).deleteCookies("JSESSIONID", "XSRF-TOKEN"))
       .addFilterBefore(sessionAuthenticationFilter, AnonymousAuthenticationFilter.class)
       .build();
   }

@@ -3,5 +3,5 @@ import react from "@vitejs/plugin-react";
 
 export default defineConfig({
     plugins: [react()],
-    test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], exclude: ["e2e/**", "node_modules/**", "dist/**"], clearMocks: true, restoreMocks: true },
+    test: { environment: "jsdom", setupFiles: ["./src/test/setup.ts"], exclude: ["e2e/**", "e2e-real/**", "node_modules/**", "dist/**"], clearMocks: true, restoreMocks: true },
 });

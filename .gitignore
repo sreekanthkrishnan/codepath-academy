@@ -3,4 +3,5 @@ dist/
 *.tsbuildinfo
 .DS_Store
 apps/api/target/
+.e2e-logs/
 .env
